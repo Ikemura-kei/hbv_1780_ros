@@ -6,7 +6,7 @@
 #include <cv_bridge/cv_bridge.h>
 
 #define SHOW_IMG true
-#define PUB_MSG false
+#define PUB_MSG true
 
 static int counter = 0;
 
