@@ -68,7 +68,8 @@ static ExeEvaluator publishEvaluator("<image publish>");
 /*
  * Node parameters:
  *      - /<node_name>/left_camera_config_file (string): path to the calibration parameters of the left camera
- *      - /<node_name>/right_camera_config_file (string): path to the calibration parameters of the right camera
+ *      - /<node_name>/right_camera_config_file (string): path to the calibration parameters of the right camera4
+ *      - /<node_name>/device (string): camera device, such as /dev/video2, which is the default value
 */
 
 int main(int ac, char **av)
@@ -87,6 +88,11 @@ int main(int ac, char **av)
     if (!nh.getParam("right_camera_config_file", right_camera_config_file))
     {
         ROS_FATAL_STREAM("Config file to the right camera not given!");
+    }
+    std::string device = "/dev/video2";
+    if (!nh.getParam("device", device))
+    {
+        ROS_WARN_STREAM("Video device not set, using default: " << device);
     }
 
     // -- read calibration parameters --
@@ -113,7 +119,7 @@ int main(int ac, char **av)
     ros::Publisher rightImgRectPub = nh.advertise<sensor_msgs::Image>("right/image_rect", 10);
 
     // -- static variables --
-    static HBV1780::HBV1780Camera cameraHandle; // initialization is done within the constructor, so be careful not to make this a variable defined outside of main
+    static HBV1780::HBV1780Camera cameraHandle(device); // initialization is done within the constructor, so be careful not to make this a variable defined outside of main
     static cv::Mat left;
     static cv::Mat right;
     static cv::Mat whole;

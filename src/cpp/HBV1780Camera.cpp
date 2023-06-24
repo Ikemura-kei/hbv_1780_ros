@@ -12,20 +12,25 @@
 #include <HBV1780Camera.hpp>
 
 #include <opencv2/opencv.hpp>
+#include <regex>
 
 #include <chrono>
 using namespace std::chrono;
 
 namespace HBV1780
 {
-    HBV1780Camera::HBV1780Camera()
+    HBV1780Camera::HBV1780Camera(std::string device)
     {
         this->IMG_HALF_WIDTH = HBV_1780_SET_WIDTH_HALF;
         this->IMG_HEIGHT = HBV_1780_SET_HEIGHT;
         this->IMG_WIDTH = HBV_1780_SET_WIDTH;
 
         // -- use gstreamer backend, otherwise the frame rate is about 8Hz, probably because OpenCV's defualt implementation is too bad --
-        std::string gstreamerStr = "v4l2src device=/dev/video2 ! image/jpeg, width=1280, height=480, framerate=30/1 ! jpegdec ! videoconvert ! appsink";
+        std::string gstreamerStr = "v4l2src device=DEVICE_PLACEHOLDER ! image/jpeg, width=WIDTH_PLACEHOLDER, height=HEIGHT_PLACEHOLDER, framerate=30/1 ! jpegdec ! videoconvert ! appsink";
+        gstreamerStr = std::regex_replace(gstreamerStr, std::regex("DEVICE_PLACEHOLDER"), device);
+        gstreamerStr = std::regex_replace(gstreamerStr, std::regex("WIDTH_PLACEHOLDER"), std::to_string(this->IMG_WIDTH));
+        gstreamerStr = std::regex_replace(gstreamerStr, std::regex("HEIGHT_PLACEHOLDER"), std::to_string(this->IMG_HEIGHT));
+        // std::cout << gstreamerStr << std::endl;
         static cv::VideoCapture cap(gstreamerStr, cv::CAP_GSTREAMER);
         this->camPtr = &cap;
         this->imageSize = cv::Size(this->IMG_HALF_WIDTH, this->IMG_HEIGHT);

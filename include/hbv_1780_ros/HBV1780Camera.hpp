@@ -16,7 +16,7 @@ namespace HBV1780
     class HBV1780Camera
     {
     public:
-        HBV1780Camera();
+        HBV1780Camera(std::string device);
 /**
  * @brief Get the current frame.
  * 
