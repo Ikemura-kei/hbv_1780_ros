@@ -1,8 +1,8 @@
 <launch>
 
-<node pkg="hbv_1780_ros" type="hbv_1780_node" name="hbv_1780_node" output="screen">
-    <param name="left_camera_config_file" value="/home/ikemura/Robotics/sentry_2023_ws/config/hbv1780_center/left.yaml" />
-    <param name="right_camera_config_file" value="/home/ikemura/Robotics/sentry_2023_ws/config/hbv1780_center/right.yaml" />
+<node pkg="hbv_1780_ros" type="hbv_1780_node" name="hbv_1780_center" output="screen">
+    <param name="left_camera_config_file" value="$(find hbv_1780_ros)/../config/hbv1780_center/left.yaml" />
+    <param name="right_camera_config_file" value="$(find hbv_1780_ros)/../config/hbv1780_center/right.yaml" />
 </node>
 
 </launch>

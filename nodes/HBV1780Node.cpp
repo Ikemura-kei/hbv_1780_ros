@@ -1,3 +1,13 @@
+/**
+ * @file HBV1780Node.cpp
+ * @author IKEMURA, Kei (ikemurakei2001@gmial.com)
+ * @brief This file defines a node to read a camera and publish (if configured so) raw and rectified images.
+ * @version 0.1
+ * @date 2023-06-25
+ * 
+ * @copyright Copyright (c) 2023
+ * 
+ */
 #include <ros/ros.h>
 
 #include <HBV1780Camera.hpp>
@@ -7,11 +17,10 @@
 #include <filesystem>
 #include <chrono>
 
-#define SHOW_IMG false
-#define PUB_MSG true
-#define PERFORMANCE_EVAL false
-
-static int counter = 0;
+// -- configuration variables --
+#define SHOW_IMG false // whether to enable cv::imshow() for direct visualization, not recommended since we publish the images, use rviz instead.
+#define PUB_MSG true // whether to publish images to topics.
+#define PERFORMANCE_EVAL false // whether to log the execution times of various sub-processes (like image undistort).
 
 void cvImg2SensorImageMsg(cv::Mat &cvImg, sensor_msgs::Image &sensorImageMsg, int counter)
 {
@@ -56,8 +65,15 @@ static ExeEvaluator getFrameEvaluator("<get frame>");
 static ExeEvaluator publishEvaluator("<image publish>");
 #endif
 
+/*
+ * Note parameters:
+ *      - /<node_name>/left_camera_config_file (string): path to the calibration parameters of the left camera
+ *      - /<node_name>/right_camera_config_file (string): path to the calibration parameters of the right camera
+*/
+
 int main(int ac, char **av)
 {
+    // -- initialize node and retrieve parameters --
     ros::init(ac, av, "hbv_1780_node");
     ros::Time::init();
     ros::NodeHandle nh("~");
@@ -73,6 +89,7 @@ int main(int ac, char **av)
         ROS_FATAL_STREAM("Config file to the right camera not given!");
     }
 
+    // -- read calibration parameters --
     left_camera_config_file = std::string(realpath(left_camera_config_file.c_str(), NULL));
     right_camera_config_file = std::string(realpath(right_camera_config_file.c_str(), NULL));
 
@@ -88,16 +105,19 @@ int main(int ac, char **av)
     cv::Mat rightDistCoeff;
     fsRight["distortion_coefficients"] >> rightDistCoeff;
 
+    // -- setup publishers --
     ros::Publisher leftImgPub = nh.advertise<sensor_msgs::Image>("left/image_raw", 10);
     ros::Publisher rightImgPub = nh.advertise<sensor_msgs::Image>("right/image_raw", 10);
 
     ros::Publisher leftImgRectPub = nh.advertise<sensor_msgs::Image>("left/image_rect", 10);
     ros::Publisher rightImgRectPub = nh.advertise<sensor_msgs::Image>("right/image_rect", 10);
 
-    static HBV1780::HBV1780Camera cameraHandle;
+    // -- static variables --
+    static HBV1780::HBV1780Camera cameraHandle; // initialization is done within the constructor, so be careful not to make this a variable defined outside of main
     static cv::Mat left;
     static cv::Mat right;
     static cv::Mat whole;
+    static int counter = 0;
 
     if (!cameraHandle.initialized())
     {

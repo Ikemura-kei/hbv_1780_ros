@@ -1,3 +1,13 @@
+/**
+ * @file HBV1780Constants.hpp
+ * @author IKEMURA, Kei (ikemurakei2001@gmail.com)
+ * @brief This file contains some constant definitions about the camera
+ * @version 0.1
+ * @date 2023-06-25
+ * 
+ * @copyright Copyright (c) 2023
+ * 
+ */
 #pragma once
 
 namespace HBV1780

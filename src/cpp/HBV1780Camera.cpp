@@ -1,3 +1,13 @@
+/**
+ * @file HBV1780Camera.cpp
+ * @author IKEMURA, Kei (ikemurakei2001@gmial.com)
+ * @brief This file defines the HBV1780Camera class for interacting with the camera.
+ * @version 0.1
+ * @date 2023-06-25
+ * 
+ * @copyright Copyright (c) 2023
+ * 
+ */
 #include <HBV1780Constants.hpp>
 #include <HBV1780Camera.hpp>
 
@@ -43,9 +53,7 @@ namespace HBV1780
         *(this->camPtr) >> this->frame;
 
         if (this->frame.empty())
-        {
             return false;
-        }
 
         // -- the returned raw frame is a combined image of left and right, so we crop --
         cv::Rect leftROI(cv::Point(0, 0), this->imageSize);
