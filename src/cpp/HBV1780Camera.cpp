@@ -14,10 +14,10 @@ namespace HBV1780
         this->IMG_HEIGHT = HBV_1780_SET_HEIGHT;
         this->IMG_WIDTH = HBV_1780_SET_WIDTH;
 
-        static cv::VideoCapture cap(2);
+        // -- use gstreamer backend, otherwise the frame rate is about 8Hz, probably because OpenCV's defualt implementation is too bad --
+        std::string gstreamerStr = "v4l2src device=/dev/video2 ! image/jpeg, width=1280, height=480, framerate=30/1 ! jpegdec ! videoconvert ! appsink";
+        static cv::VideoCapture cap(gstreamerStr, cv::CAP_GSTREAMER);
         this->camPtr = &cap;
-        this->camPtr->set(cv::CAP_PROP_FRAME_WIDTH, this->IMG_WIDTH);
-        this->camPtr->set(cv::CAP_PROP_FRAME_HEIGHT, this->IMG_HEIGHT);
         this->imageSize = cv::Size(this->IMG_HALF_WIDTH, this->IMG_HEIGHT);
 
         // -- test read --
@@ -26,7 +26,7 @@ namespace HBV1780
 
         if (testFrame.empty())
         {
-            // no valid frame read
+            // no valid frame read, initialization failed.
             this->isInitialized = false;
             this->camPtr = nullptr;
             return;
@@ -40,19 +40,14 @@ namespace HBV1780
         if (!this->isInitialized)
             return false;
 
-        auto start = high_resolution_clock::now();
         *(this->camPtr) >> this->frame;
-        auto stop = high_resolution_clock::now();
-        auto duration = duration_cast<microseconds>(stop - start);
-        std::cout << duration.count() / 1000.0 << " ms" << std::endl;
 
         if (this->frame.empty())
         {
             return false;
         }
 
-        // std::cout << this->imageSize << std::endl;
-
+        // -- the returned raw frame is a combined image of left and right, so we crop --
         cv::Rect leftROI(cv::Point(0, 0), this->imageSize);
         cv::Rect rightROI(cv::Point(this->IMG_HALF_WIDTH, 0), this->imageSize);
 

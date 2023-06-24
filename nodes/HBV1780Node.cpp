@@ -5,11 +5,56 @@
 #include <sensor_msgs/Image.h>
 #include <cv_bridge/cv_bridge.h>
 #include <filesystem>
+#include <chrono>
 
-#define SHOW_IMG true
+#define SHOW_IMG false
 #define PUB_MSG true
+#define PERFORMANCE_EVAL false
 
 static int counter = 0;
+
+void cvImg2SensorImageMsg(cv::Mat &cvImg, sensor_msgs::Image &sensorImageMsg, int counter)
+{
+    // -- prepare header --
+    std_msgs::Header header;
+    header.seq = counter;
+    header.stamp = ros::Time::now();
+
+    // -- prepare bridge variable --
+    cv_bridge::CvImage bridgeVar(header, sensor_msgs::image_encodings::BGR8, cvImg);
+
+    // -- convert to msg --
+    bridgeVar.toImageMsg(sensorImageMsg);
+}
+
+#if PERFORMANCE_EVAL
+class ExeEvaluator
+{
+public:
+    ExeEvaluator(std::string procedureName) : procedureName(procedureName) {}
+
+    void tic()
+    {
+        start = std::chrono::high_resolution_clock::now();
+    }
+
+    void tac()
+    {
+        auto end = std::chrono::high_resolution_clock::now();
+        auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
+        ROS_INFO_STREAM("[hbv1780]: Execution duration for " << procedureName << " took: " << duration.count() / 1000.0f << " ms.");
+    }
+
+private:
+    std::string procedureName;
+    std::chrono::_V2::system_clock::time_point start;
+};
+
+static ExeEvaluator entireLoopEvaluator("<entire loop>");
+static ExeEvaluator undistorEvaluator("<undistort>");
+static ExeEvaluator getFrameEvaluator("<get frame>");
+static ExeEvaluator publishEvaluator("<image publish>");
+#endif
 
 int main(int ac, char **av)
 {
@@ -66,57 +111,73 @@ int main(int ac, char **av)
     // cv::namedWindow("whole");
 #endif
 
-    ros::Time lastTime = ros::Time::now();
     ros::Rate rate(1000);
     while (ros::ok())
     {
-        // rate.sleep();
-        cameraHandle.getFrame(left, right, whole);
+#if PERFORMANCE_EVAL
+        entireLoopEvaluator.tic();
+#endif
+        rate.sleep();
 
-        cv::Mat undistortedLeft;
+#if PERFORMANCE_EVAL
+        getFrameEvaluator.tic();
+#endif
+        bool ret = cameraHandle.getFrame(left, right, whole);
+#if PERFORMANCE_EVAL
+        getFrameEvaluator.tac();
+#endif
+
+        if (!ret)
+        {
+            ROS_WARN_STREAM("Image retrieval failed!");
+            continue;
+        }
+
+        cv::Mat undistortedLeft, undistortedRight;
+
+#if PERFORMANCE_EVAL
+        undistorEvaluator.tic();
+#endif
         cv::undistort(left, undistortedLeft, leftCamMat, leftDistCoeff);
-
-        cv::Mat undistortedRight;
         cv::undistort(right, undistortedRight, rightCamMat, rightDistCoeff);
-
-        float dt = (ros::Time::now() - lastTime).toSec();
-        float fps = 1 / dt;
-        ROS_INFO_STREAM("fps: " << std::to_string(fps));
-        lastTime = ros::Time::now();
+#if PERFORMANCE_EVAL
+        undistorEvaluator.tac();
+#endif
 
 #if SHOW_IMG
         cv::imshow("left", undistortedLeft);
         cv::imshow("right", undistortedRight);
-        // cv::imshow("whole", whole);
         char k = cv::waitKey(1);
         if (k == 'q')
             break;
 #endif
 
 #if PUB_MSG
-        cv_bridge::CvImage leftCvImg, rightCvImg;
-        sensor_msgs::Image leftImgMsg, rightImgMsg;
+        sensor_msgs::Image leftRawImgMsg, rightRawImgMsg, leftRectImgMsg, rightRectImgMsg;
 
-        // -- prepare common image header --
-        std_msgs::Header header;         // empty header
-        header.seq = counter;            // user defined counter
-        header.stamp = ros::Time::now(); // time
-
-        // -- convert to commonly used RGB8 --
-        cv::cvtColor(left, left, cv::COLOR_BGR2RGB);
-        cv::cvtColor(right, right, cv::COLOR_BGR2RGB);
-
-        // -- create cv_bridge objects --
-        leftCvImg = cv_bridge::CvImage(header, sensor_msgs::image_encodings::RGB8, left);
-        rightCvImg = cv_bridge::CvImage(header, sensor_msgs::image_encodings::RGB8, right);
-
+#if PERFORMANCE_EVAL
+        publishEvaluator.tic();
+#endif
         // -- convert to sensor_msgs::Image message --
-        leftCvImg.toImageMsg(leftImgMsg);   // from cv_bridge to sensor_msgs::Image
-        rightCvImg.toImageMsg(rightImgMsg); // from cv_bridge to sensor_msgs::Image
+        cvImg2SensorImageMsg(undistortedLeft, leftRectImgMsg, counter);
+        cvImg2SensorImageMsg(undistortedRight, rightRectImgMsg, counter);
+        cvImg2SensorImageMsg(left, leftRawImgMsg, counter);
+        cvImg2SensorImageMsg(right, rightRawImgMsg, counter);
 
         // -- publish the messages --
-        leftImgPub.publish(leftImgMsg);
-        rightImgPub.publish(rightImgMsg);
+        leftImgPub.publish(leftRawImgMsg);
+        rightImgPub.publish(rightRawImgMsg);
+        leftImgRectPub.publish(leftRectImgMsg);
+        rightImgRectPub.publish(rightRectImgMsg);
+#if PERFORMANCE_EVAL
+        publishEvaluator.tac();
+#endif
+
+#endif
+
+#if PERFORMANCE_EVAL
+        entireLoopEvaluator.tac();
+        std::cout << std::endl;
 #endif
     }
 }
