@@ -1,13 +1,21 @@
 # HBV-1780 ROS Wrapper
 
+## Setup
+We provide some dummy configuration (like calibration parameters) inside the `config` folder. Please copy that to your workspace root folder (i.e. parallel to `src`, `build`, `devel`, etc.) by:
+
+```bash
+cd <workspace_root>
+cp src/hbv_1780_ros/config .
+```
+
 ## Test run
 You can run __single camera__ case by (we assume the camera is mounted at `/dev/video2`):
-```
+```bash
 roslaunch hbv_1780_ros hbv_1780.launch
 ```
 
 For __two camera__ case:
-```
+```bash
 roslaunch hbv_1780_ros hbv_1780_two_cameras.launch
 ```
 
