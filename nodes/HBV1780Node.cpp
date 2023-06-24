@@ -66,7 +66,7 @@ static ExeEvaluator publishEvaluator("<image publish>");
 #endif
 
 /*
- * Note parameters:
+ * Node parameters:
  *      - /<node_name>/left_camera_config_file (string): path to the calibration parameters of the left camera
  *      - /<node_name>/right_camera_config_file (string): path to the calibration parameters of the right camera
 */
