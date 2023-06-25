@@ -1,0 +1,23 @@
+<launch>
+
+<node pkg="hbv_1780_ros" type="hbv_1780_node" name="hbv_1780_center" output="screen">
+    <param name="left_camera_config_file" value="$(find hbv_1780_ros)/../../config/hbv1780_center/left.yaml" />
+    <param name="right_camera_config_file" value="$(find hbv_1780_ros)/../../config/hbv1780_center/right.yaml" />
+    <param name="device" value="/dev/video2" />
+</node>
+
+<node pkg="hbv_1780_ros" type="hbv_1780_node" name="hbv_1780_left_side" output="screen">
+    <param name="left_camera_config_file" value="$(find hbv_1780_ros)/../../config/hbv1780_left_side/left.yaml" />
+    <param name="right_camera_config_file" value="$(find hbv_1780_ros)/../../config/hbv1780_left_side/right.yaml" />
+    <param name="device" value="/dev/video4" />
+</node>
+
+<node pkg="hbv_1780_ros" type="hbv_1780_node" name="hbv_1780_right_side" output="screen">
+    <param name="left_camera_config_file" value="$(find hbv_1780_ros)/../../config/hbv1780_right_side/left.yaml" />
+    <param name="right_camera_config_file" value="$(find hbv_1780_ros)/../../config/hbv1780_right_side/right.yaml" />
+    <param name="device" value="/dev/video6" />
+</node>
+
+<node pkg="rviz" type="rviz" name="hbv1780_rviz" args="-d $(find hbv_1780_ros)/rviz/three_cam.rviz"/>
+
+</launch>

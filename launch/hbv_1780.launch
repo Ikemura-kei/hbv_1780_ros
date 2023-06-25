@@ -3,6 +3,7 @@
 <node pkg="hbv_1780_ros" type="hbv_1780_node" name="hbv_1780_center" output="screen">
     <param name="left_camera_config_file" value="$(find hbv_1780_ros)/../../config/hbv1780_center/left.yaml" />
     <param name="right_camera_config_file" value="$(find hbv_1780_ros)/../../config/hbv1780_center/right.yaml" />
+    <param name="device" value="/dev/video2" />
 </node>
 
 <node pkg="rviz" type="rviz" name="hbv1780_rviz" args="-d $(find hbv_1780_ros)/rviz/hbv1780.rviz"/>
