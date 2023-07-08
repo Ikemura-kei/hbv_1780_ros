@@ -4,9 +4,14 @@
     <param name="left_camera_config_file" value="$(find hbv_1780_ros)/../../config/hbv1780_center/left.yaml" />
     <param name="right_camera_config_file" value="$(find hbv_1780_ros)/../../config/hbv1780_center/right.yaml" />
     <param name="device" value="/dev/video2" />
-    <param name="pub_whole" value="false" />
+    <param name="pub_whole" value="true" />
 </node>
 
-<!-- <node pkg="rviz" type="rviz" name="hbv1780_rviz" args="-d $(find hbv_1780_ros)/rviz/hbv1780.rviz"/> -->
+<node pkg="hbv_1780_ros" type="take_picture.py" name="take_pic" output="screen">
+    <param name="image_topic" value="/hbv_1780_center/whole" />
+    <param name="save_dir" value="$(find hbv_1780_ros)/../../images/ordinary1/" />
+    <param name="mode" value="0" />
+</node>
+
 
 </launch>

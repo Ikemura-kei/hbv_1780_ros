@@ -4,9 +4,9 @@
  * @brief This file defines a node to read a camera and publish (if configured so) raw and rectified images.
  * @version 0.1
  * @date 2023-06-25
- * 
+ *
  * @copyright Copyright (c) 2023
- * 
+ *
  */
 #include <ros/ros.h>
 
@@ -18,16 +18,16 @@
 #include <chrono>
 
 // -- configuration variables --
-#define SHOW_IMG false // whether to enable cv::imshow() for direct visualization, not recommended since we publish the images, use rviz instead.
-#define PUB_MSG true // whether to publish images to topics.
+#define SHOW_IMG false         // whether to enable cv::imshow() for direct visualization, not recommended since we publish the images, use rviz instead.
+#define PUB_MSG true           // whether to publish images to topics.
 #define PERFORMANCE_EVAL false // whether to log the execution times of various sub-processes (like image undistort).
 
-void cvImg2SensorImageMsg(cv::Mat &cvImg, sensor_msgs::Image &sensorImageMsg, int counter)
+void cvImg2SensorImageMsg(cv::Mat &cvImg, sensor_msgs::Image &sensorImageMsg, int counter, ros::Time time)
 {
     // -- prepare header --
     std_msgs::Header header;
     header.seq = counter;
-    header.stamp = ros::Time::now();
+    header.stamp = time;
 
     // -- prepare bridge variable --
     cv_bridge::CvImage bridgeVar(header, sensor_msgs::image_encodings::BGR8, cvImg);
@@ -70,7 +70,7 @@ static ExeEvaluator publishEvaluator("<image publish>");
  *      - /<node_name>/left_camera_config_file (string): path to the calibration parameters of the left camera
  *      - /<node_name>/right_camera_config_file (string): path to the calibration parameters of the right camera4
  *      - /<node_name>/device (string): camera device, such as /dev/video2, which is the default value
-*/
+ */
 
 int main(int ac, char **av)
 {
@@ -94,6 +94,12 @@ int main(int ac, char **av)
     {
         ROS_WARN_STREAM("Video device not set, using default: " << device);
     }
+    bool pubWhole = false;
+    if (!nh.param<bool>("pub_whole", pubWhole, false))
+    {
+        ROS_WARN_STREAM("Publish whole image argument not set, by default is " << std::boolalpha << pubWhole);
+    }
+    ROS_INFO_STREAM("Publish whole image argument is " << std::boolalpha << pubWhole);
 
     // -- read calibration parameters --
     left_camera_config_file = std::string(realpath(left_camera_config_file.c_str(), NULL));
@@ -104,16 +110,37 @@ int main(int ac, char **av)
     fsLeft["camera_matrix"] >> leftCamMat;
     cv::Mat leftDistCoeff;
     fsLeft["distortion_coefficients"] >> leftDistCoeff;
+    cv::Mat leftT;
+    fsLeft["T"] >> leftT;
+    cv::Mat leftR;
+    fsLeft["R"] >> leftR;
+    // std::cout << leftT << leftR << std::endl;
 
-    cv::FileStorage fsRight(left_camera_config_file, cv::FileStorage::READ);
+    cv::FileStorage fsRight(right_camera_config_file, cv::FileStorage::READ);
     cv::Mat rightCamMat;
     fsRight["camera_matrix"] >> rightCamMat;
     cv::Mat rightDistCoeff;
     fsRight["distortion_coefficients"] >> rightDistCoeff;
+    cv::Mat rightT;
+    fsRight["T"] >> rightT;
+    cv::Mat rightR;
+    fsRight["R"] >> rightR;
+    // std::cout << rightT << rightR << std::endl;
+
+    // -- initialize rectification maps --
+    cv::Size imageSize = cv::Size(640, 480);
+    cv::Mat R1, R2, P1, P2, Q, newCamMat;
+    cv::stereoRectify(leftCamMat, leftDistCoeff, rightCamMat, rightDistCoeff, imageSize, rightR, rightT, R1, R2, P1, P2, Q);
+    cv::Mat leftMap1, leftMap2;
+    cv::initUndistortRectifyMap(leftCamMat, leftDistCoeff, leftR, newCamMat, imageSize, CV_32FC1, leftMap1, leftMap2);
+    cv::Mat rightMap1, rightMap2;
+    cv::initUndistortRectifyMap(rightCamMat, rightDistCoeff, rightR, newCamMat, imageSize, CV_32FC1, rightMap1, rightMap2);
+    std::cout << Q << std::endl;
 
     // -- setup publishers --
     ros::Publisher leftImgPub = nh.advertise<sensor_msgs::Image>("left/image_raw", 10);
     ros::Publisher rightImgPub = nh.advertise<sensor_msgs::Image>("right/image_raw", 10);
+    ros::Publisher wholeImgPub = nh.advertise<sensor_msgs::Image>("whole", 10);
 
     ros::Publisher leftImgRectPub = nh.advertise<sensor_msgs::Image>("left/image_rect", 10);
     ros::Publisher rightImgRectPub = nh.advertise<sensor_msgs::Image>("right/image_rect", 10);
@@ -159,13 +186,13 @@ int main(int ac, char **av)
             continue;
         }
 
-        cv::Mat undistortedLeft, undistortedRight;
+        cv::Mat rectLeft, rectRight;
 
 #if PERFORMANCE_EVAL
         undistorEvaluator.tic();
 #endif
-        cv::undistort(left, undistortedLeft, leftCamMat, leftDistCoeff);
-        cv::undistort(right, undistortedRight, rightCamMat, rightDistCoeff);
+        cv::remap(left, rectLeft, leftMap1, leftMap2, cv::INTER_LINEAR);
+        cv::remap(right, rectRight, rightMap1, rightMap2, cv::INTER_LINEAR);
 #if PERFORMANCE_EVAL
         undistorEvaluator.tac();
 #endif
@@ -179,22 +206,29 @@ int main(int ac, char **av)
 #endif
 
 #if PUB_MSG
-        sensor_msgs::Image leftRawImgMsg, rightRawImgMsg, leftRectImgMsg, rightRectImgMsg;
+        sensor_msgs::Image leftRawImgMsg, rightRawImgMsg, leftRectImgMsg, rightRectImgMsg, wholeMsg;
 
 #if PERFORMANCE_EVAL
         publishEvaluator.tic();
 #endif
         // -- convert to sensor_msgs::Image message --
-        cvImg2SensorImageMsg(undistortedLeft, leftRectImgMsg, counter);
-        cvImg2SensorImageMsg(undistortedRight, rightRectImgMsg, counter);
-        cvImg2SensorImageMsg(left, leftRawImgMsg, counter);
-        cvImg2SensorImageMsg(right, rightRawImgMsg, counter);
+        ros::Time now = ros::Time::now();
+        cvImg2SensorImageMsg(rectLeft, leftRectImgMsg, counter, now);
+        cvImg2SensorImageMsg(rectRight, rightRectImgMsg, counter, now);
+        cvImg2SensorImageMsg(left, leftRawImgMsg, counter, now);
+        cvImg2SensorImageMsg(right, rightRawImgMsg, counter, now);
+        if (pubWhole)
+            cvImg2SensorImageMsg(whole, wholeMsg, counter, now);
 
         // -- publish the messages --
         leftImgPub.publish(leftRawImgMsg);
         rightImgPub.publish(rightRawImgMsg);
         leftImgRectPub.publish(leftRectImgMsg);
         rightImgRectPub.publish(rightRectImgMsg);
+        if (pubWhole)
+            wholeImgPub.publish(wholeMsg);
+
+        counter++;
 #if PERFORMANCE_EVAL
         publishEvaluator.tac();
 #endif
