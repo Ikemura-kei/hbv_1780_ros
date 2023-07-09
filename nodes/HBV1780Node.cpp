@@ -13,6 +13,7 @@
 #include <HBV1780Camera.hpp>
 
 #include <sensor_msgs/Image.h>
+#include <sensor_msgs/CameraInfo.h>
 #include <cv_bridge/cv_bridge.h>
 #include <filesystem>
 #include <chrono>
@@ -127,6 +128,38 @@ int main(int ac, char **av)
     fsRight["R"] >> rightR;
     // std::cout << rightT << rightR << std::endl;
 
+    // -- initialize camera info msg --
+    sensor_msgs::CameraInfo cameraInfo;
+    cameraInfo.header.seq = 0;
+    cameraInfo.header.frame_id = "";
+    cameraInfo.distortion_model = "plumb_bob";
+    cameraInfo.width = (int)fsLeft["image_width"];
+    cameraInfo.height = (int)fsLeft["image_height"];
+    cameraInfo.D.resize(5);
+    for (int i = 0; i < 5; i++)
+        cameraInfo.D[i] = leftDistCoeff.at<double>(i);
+    for (int i = 0; i < 9; i++)
+        cameraInfo.K[i] = leftCamMat.at<double>(i);
+    for (int i = 0; i < 9; i++)
+        cameraInfo.R[i] = 0;
+    cameraInfo.R[0] = cameraInfo.R[4] = cameraInfo.R[8] = 1.0;
+
+    // -- P is a 3X4 projection matrix --
+    cameraInfo.P[0] = cameraInfo.K[0];
+    cameraInfo.P[1] = cameraInfo.K[1];
+    cameraInfo.P[2] = cameraInfo.K[2];
+    cameraInfo.P[3] = 0;
+
+    cameraInfo.P[4] = cameraInfo.K[3];
+    cameraInfo.P[5] = cameraInfo.K[4];
+    cameraInfo.P[6] = cameraInfo.K[5];
+    cameraInfo.P[7] = 0;
+
+    cameraInfo.P[8] = 0;
+    cameraInfo.P[9] = 0;
+    cameraInfo.P[10] = 1;
+    cameraInfo.P[11] = 0;
+
     // -- initialize rectification maps --
     cv::Size imageSize = cv::Size(640, 480);
     cv::Mat R1, R2, P1, P2, Q, newCamMat;
@@ -144,6 +177,8 @@ int main(int ac, char **av)
 
     ros::Publisher leftImgRectPub = nh.advertise<sensor_msgs::Image>("left/image_rect", 10);
     ros::Publisher rightImgRectPub = nh.advertise<sensor_msgs::Image>("right/image_rect", 10);
+
+    ros::Publisher cameraInfoPub = nh.advertise<sensor_msgs::CameraInfo>("camera_info", 10);
 
     // -- static variables --
     static HBV1780::HBV1780Camera cameraHandle(device); // initialization is done within the constructor, so be careful not to make this a variable defined outside of main
@@ -227,6 +262,9 @@ int main(int ac, char **av)
         rightImgRectPub.publish(rightRectImgMsg);
         if (pubWhole)
             wholeImgPub.publish(wholeMsg);
+        cameraInfo.header.stamp = ros::Time::now();
+        cameraInfo.header.seq += 1;
+        cameraInfoPub.publish(cameraInfo);
 
         counter++;
 #if PERFORMANCE_EVAL
