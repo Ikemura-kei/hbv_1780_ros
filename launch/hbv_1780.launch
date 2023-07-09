@@ -7,8 +7,6 @@
     <param name="pub_whole" value="false" />
 </node>
 
-<node pkg="tf2_ros" type="static_transform_publisher" name="hbv_center_to_depth_frame" args="0 0 0 0 0 0 hbv_1780_center depth_frame" />
-
 <!-- <node pkg="rviz" type="rviz" name="hbv1780_rviz" args="-d $(find hbv_1780_ros)/rviz/hbv1780.rviz"/> -->
 
 </launch>
