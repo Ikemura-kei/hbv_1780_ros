@@ -11,7 +11,10 @@
 #include <ros/ros.h>
 
 #include <HBV1780Camera.hpp>
-
+#include <cstdio>
+#include <iostream>
+#include <memory>
+#include <stdexcept>
 #include <sensor_msgs/Image.h>
 #include <sensor_msgs/CameraInfo.h>
 #include <cv_bridge/cv_bridge.h>
@@ -22,6 +25,22 @@
 #define SHOW_IMG false         // whether to enable cv::imshow() for direct visualization, not recommended since we publish the images, use rviz instead.
 #define PUB_MSG true           // whether to publish images to topics.
 #define PERFORMANCE_EVAL false // whether to log the execution times of various sub-processes (like image undistort).
+
+std::string exec(const char *cmd)
+{
+    std::array<char, 128> buffer;
+    std::string result;
+    std::unique_ptr<FILE, decltype(&pclose)> pipe(popen(cmd, "r"), pclose);
+    if (!pipe)
+    {
+        throw std::runtime_error("popen() failed!");
+    }
+    while (fgets(buffer.data(), buffer.size(), pipe.get()) != nullptr)
+    {
+        result += buffer.data();
+    }
+    return result;
+}
 
 void cvImg2SensorImageMsg(cv::Mat &cvImg, sensor_msgs::Image &sensorImageMsg, int counter, ros::Time time)
 {
@@ -85,16 +104,51 @@ int main(int ac, char **av)
     {
         ROS_FATAL_STREAM("Config file to the left camera not given!");
     }
+
     std::string right_camera_config_file = "";
     if (!nh.getParam("right_camera_config_file", right_camera_config_file))
     {
         ROS_FATAL_STREAM("Config file to the right camera not given!");
     }
+
     std::string device = "/dev/video2";
     if (!nh.getParam("device", device))
     {
         ROS_WARN_STREAM("Video device not set, using default: " << device);
     }
+
+    // -- get the device indexes that correspond to each bus id --
+    std::string s = exec("v4l2-ctl --list-devices");
+    std::string delimiter = "\n";
+    size_t pos = 0;
+    int counter_ = 0;
+    std::string token;
+    ROS_INFO_STREAM("--> Original device id: " << device);
+    while ((pos = s.find(delimiter)) != std::string::npos)
+    {
+        token = s.substr(0, pos);
+        // ROS_ERROR_STREAM(token);
+        if (counter_ % 5 == 0)
+        {
+            // -- this is the line containing bus id --
+            if (token.find(device) != std::string::npos)
+            {
+                size_t nextPos = s.find(delimiter, pos + 1);
+                std::string id = s.substr(pos + 1, nextPos - pos - 1);
+                std::string followed = s.substr(pos + 1, nextPos - pos - 2); // to cope with two-digit camera ids
+                if (isdigit(followed[followed.size()-1]))
+                    device = std::string("/dev/video") + followed[followed.size()-1] + id.back();
+                else
+                    device = std::string("/dev/video") + id.back();
+                break;
+            }
+        }
+        s.erase(0, pos + delimiter.length());
+
+        counter_ += 1;
+    }
+    ROS_INFO_STREAM("--> New device id: " << device);
+
     bool pubWhole = false;
     if (!nh.param<bool>("pub_whole", pubWhole, false))
     {
@@ -105,7 +159,8 @@ int main(int ac, char **av)
     // -- read calibration parameters --
     left_camera_config_file = std::string(realpath(left_camera_config_file.c_str(), NULL));
     right_camera_config_file = std::string(realpath(right_camera_config_file.c_str(), NULL));
-
+    ROS_INFO_STREAM("--> Left config: " << left_camera_config_file);
+    ROS_INFO_STREAM("--> Right config: " << right_camera_config_file);
     cv::FileStorage fsLeft(left_camera_config_file, cv::FileStorage::READ);
     cv::Mat leftCamMat;
     fsLeft["camera_matrix"] >> leftCamMat;

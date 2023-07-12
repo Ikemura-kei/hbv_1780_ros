@@ -15,6 +15,7 @@
 #include <regex>
 
 #include <chrono>
+#include <ros/ros.h>
 using namespace std::chrono;
 
 namespace HBV1780
@@ -30,8 +31,9 @@ namespace HBV1780
         gstreamerStr = std::regex_replace(gstreamerStr, std::regex("DEVICE_PLACEHOLDER"), device);
         gstreamerStr = std::regex_replace(gstreamerStr, std::regex("WIDTH_PLACEHOLDER"), std::to_string(this->IMG_WIDTH));
         gstreamerStr = std::regex_replace(gstreamerStr, std::regex("HEIGHT_PLACEHOLDER"), std::to_string(this->IMG_HEIGHT));
-        // std::cout << gstreamerStr << std::endl;
+        ROS_WARN_STREAM(gstreamerStr);
         static cv::VideoCapture cap(gstreamerStr, cv::CAP_GSTREAMER);
+        // static cv::VideoCapture cap(6);
         this->camPtr = &cap;
         this->imageSize = cv::Size(this->IMG_HALF_WIDTH, this->IMG_HEIGHT);
 
