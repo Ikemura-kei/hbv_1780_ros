@@ -128,21 +128,20 @@ int main(int ac, char **av)
     {
         token = s.substr(0, pos);
         // ROS_ERROR_STREAM(token);
-        if (counter_ % 5 == 0)
+        // -- this is the line containing bus id --
+        if (token.find(device) != std::string::npos)
         {
-            // -- this is the line containing bus id --
-            if (token.find(device) != std::string::npos)
-            {
-                size_t nextPos = s.find(delimiter, pos + 1);
-                std::string id = s.substr(pos + 1, nextPos - pos - 1);
-                std::string followed = s.substr(pos + 1, nextPos - pos - 2); // to cope with two-digit camera ids
-                if (isdigit(followed[followed.size()-1]))
-                    device = std::string("/dev/video") + followed[followed.size()-1] + id.back();
-                else
-                    device = std::string("/dev/video") + id.back();
-                break;
-            }
+            ROS_INFO_STREAM("--> Found!");
+            size_t nextPos = s.find(delimiter, pos + 1);
+            std::string id = s.substr(pos + 1, nextPos - pos - 1);
+            std::string followed = s.substr(pos + 1, nextPos - pos - 2); // to cope with two-digit camera ids
+            if (isdigit(followed[followed.size()-1]))
+                device = std::string("/dev/video") + followed[followed.size()-1] + id.back();
+            else
+                device = std::string("/dev/video") + id.back();
+            break;
         }
+
         s.erase(0, pos + delimiter.length());
 
         counter_ += 1;
